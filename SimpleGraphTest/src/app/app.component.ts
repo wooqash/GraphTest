@@ -1,5 +1,4 @@
 import { Component, OnInit } from '@angular/core';
-// import * as swapiModule from 'swapi-wrapper';
 
 @Component({
   selector: 'app-root',
@@ -9,30 +8,24 @@ import { Component, OnInit } from '@angular/core';
 export class AppComponent implements OnInit {
   title = 'SimpleGraphTest';
   apiUrl = 'https://swapi.co/api/people/';
-  private people;
-  private charactersWithBMI;
-  private otherCharacters;
-  private unknownCharacters;
-  private sortedCharacters;
-  private graphData;
-  private unknownLbl = 'unknown'
+  private characters;
+  private charactersWithDoB;
+  private charachtersWithoutDoB;
+  private groupCharactersByDoB;
+  private unknownLbl = 'unknown';
+  public graphData;
+
 
   ngOnInit(): void {
     new Promise((resolve, reject) => {
       this.getPeople(this.apiUrl, [], resolve, reject);
     }).then(response => {
-      this.people = response;
-      console.log(this.people);
-      this.unknownCharacters = this.getUnknowCharacters(this.people);
-      console.log(this.unknownCharacters);
-      this.otherCharacters = this.getOtherCharacters(this.people);
-      console.log(this.otherCharacters);
-      this.sortedCharacters = this.sortCharactersByBirthYear(this.otherCharacters);
-      this.charactersWithBMI = this.assignBmiToCharacter(this.sortedCharacters);
-      console.log(this.charactersWithBMI);
-
-      this.graphData = this.assignPeopleToAgeRange(this.sortedCharacters);
-      console.log(this.graphData);
+      this.characters = response;
+      this.assignBMIToCharacter(this.characters);
+      this.charachtersWithoutDoB = this.filterCharactersWithoutDoB(this.characters);
+      this.charactersWithDoB = this.filterCharactersWithDoB(this.characters);
+      this.graphData = this.assignCharactersToAgeRange(this.charactersWithDoB);
+      this.sortCharactersByBirthYear(this.graphData);
     });
   }
 
@@ -53,13 +46,14 @@ export class AppComponent implements OnInit {
       });
   }
 
-  private assignBmiToCharacter = people => {
-    if (!people) {
+  private assignBMIToCharacter = characters => {
+    if (!characters) {
       return;
     }
 
-    return people.map(character => {
-      character.BMI = this.countBMI(character).toPrecision(4);
+    return characters.map(character => {
+      character.BMI = !isNaN((this.countBMI(character))) ? parseFloat(this.countBMI(character).toPrecision(4)) : undefined;
+      character.BMIclass = this.assignColorToBMI(character.BMI);
       return character;
     });
   }
@@ -74,29 +68,44 @@ export class AppComponent implements OnInit {
     return (mass / Math.pow(height / 100, 2));
   }
 
-  private getOtherCharacters = people => {
-    if (!people) {
+  private assignColorToBMI = BMIvalue => {
+    if (BMIvalue < 16) {
+      return 'underweight';
+    } else if (BMIvalue >= 16 && BMIvalue <= 24.99) {
+      return 'normal';
+    } else if (BMIvalue >= 25 && BMIvalue <= 39.99) {
+      return 'overweight';
+    } else if (BMIvalue > 40) {
+      return 'obesity';
+    } else {
+      return 'undefined';
+    }
+  }
+
+  private filterCharactersWithDoB = characters => {
+    if (!characters) {
       return;
     }
-    return people.filter(
-      item => item !== this.unknownCharacters.find(character => character.name === item.name)
+    return characters.filter(
+      item => item.birth_year && item.birth_year !== this.unknownLbl
     );
   }
 
-  private getUnknowCharacters = people => {
-    if (!people) {
+  private filterCharactersWithoutDoB = characters => {
+    if (!characters) {
       return;
     }
-    return people.filter(
-      item => !item.birth_year || !item.mass || !item.height || (item.birth_year || item.mass || item.height) === this.unknownLbl
+    return characters.filter(
+      item => !item.birth_year || item.birth_year === this.unknownLbl
     );
   }
 
-  private sortCharactersByBirthYear = people => {
-    if (!people) {
+  private sortCharactersByBirthYear = characters => {
+    if (!characters) {
       return;
     }
-    return people.sort(this.compareCharactersByBirthYear);
+    return characters.map(group => group.series.sort(this.compareCharactersByBirthYear));
+
   }
 
   private compareCharactersByBirthYear = (currentCharacter, nextCharacter) => {
@@ -120,15 +129,15 @@ export class AppComponent implements OnInit {
     return date.toUpperCase().replace('BBY', '') * 1;
   }
 
-  private assignPeopleToAgeRange = people => {
-    if (!people) {
+  private assignCharactersToAgeRange = characters => {
+    if (!characters) {
       return;
     }
 
     return [
       {
         name: '0-20BBY',
-        series: people.filter(
+        series: characters.filter(
           character =>
             this.transformDate(character.birth_year) >= 0 &&
             this.transformDate(character.birth_year) < 20
@@ -136,7 +145,7 @@ export class AppComponent implements OnInit {
       },
       {
         name: '20-40BBY',
-        series: people.filter(
+        series: characters.filter(
           character =>
             this.transformDate(character.birth_year) >= 20 &&
             this.transformDate(character.birth_year) < 40
@@ -144,7 +153,7 @@ export class AppComponent implements OnInit {
       },
       {
         name: '40-60BBY',
-        series: people.filter(
+        series: characters.filter(
           character =>
             this.transformDate(character.birth_year) >= 40 &&
             this.transformDate(character.birth_year) < 60
@@ -152,7 +161,7 @@ export class AppComponent implements OnInit {
       },
       {
         name: '60-80BBY',
-        series: people.filter(
+        series: characters.filter(
           character =>
             this.transformDate(character.birth_year) >= 60 &&
             this.transformDate(character.birth_year) < 80
@@ -160,7 +169,7 @@ export class AppComponent implements OnInit {
       },
       {
         name: '80-100BBY',
-        series: people.filter(
+        series: characters.filter(
           character =>
             this.transformDate(character.birth_year) >= 80 &&
             this.transformDate(character.birth_year) < 100
@@ -168,13 +177,13 @@ export class AppComponent implements OnInit {
       },
       {
         name: '100BBY++',
-        series: people.filter(
+        series: characters.filter(
           character => this.transformDate(character.birth_year) >= 100
         )
       },
       {
         name: this.unknownLbl,
-        series: this.unknownCharacters
+        series: this.charachtersWithoutDoB
       }
     ];
   }
